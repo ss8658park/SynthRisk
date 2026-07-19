@@ -1,0 +1,13 @@
+[CRITICAL] line 8  (case-missing-default) Explicitly define a default case for every case statement or add `unique` qualifier to the case statement.
+    source: verible
+    why: For cmd_i values other than 3'b001 and 3'b010, neither output is assigned, so rd_o and wr_o retain their previous values and synthesis infers latches.
+    fix: Assign defaults before the case, such as `rd_o = 1'b0; wr_o = 1'b0;`, and/or add a `default:` branch assigning both outputs.
+[WARNING] line 7  (always-comb) Use 'always_comb' instead of 'always @*'.
+    source: verible
+    why: Both forms describe combinational logic here, but always_comb provides stronger SystemVerilog intent checking and better detects accidental multiple drivers or incomplete sensitivity behavior.
+    fix: Replace `always @* begin` with `always_comb begin`.
+[STYLE] line 13  (posix-eof) File must end with a newline.
+    source: verible
+    why: A missing final newline has no effect on simulation or synthesized hardware.
+    fix: Add a newline character after the final `endmodule`.
+1 critical, 1 warning, 1 style - review critical items before synthesis.

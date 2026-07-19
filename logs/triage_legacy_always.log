@@ -1,0 +1,17 @@
+[WARNING] line 8  (always-ff-and-nonblocking-sequential-assignment) Clocked sequential logic uses a plain always block and blocking assignments.
+    source: [!] AI-DETECTED (not reported by linter)
+    why: This flip-flop currently synthesizes as intended, but a plain always block does not enforce sequential-process rules and blocking assignments can create ordering-dependent simulation behavior if this logic is later expanded or interacts with other sequential logic.
+    fix: Use always_ff @(posedge clk_i or negedge rst_n_i) and nonblocking assignments (<=) for q_o in both branches.
+[WARNING] line 9  (explicit-begin) if block constructs shall explicitly use begin/end. Expected begin, got q_o
+    source: verible
+    why: The single statement is currently unambiguous and synthesizes correctly, but omitting begin/end makes later edits prone to accidentally placing statements outside the reset branch.
+    fix: Add begin/end around the reset assignment: if (!rst_n_i) begin q_o <= 1'b0; end
+[WARNING] line 10  (explicit-begin) else block constructs shall explicitly use begin/end. Expected begin, got q_o
+    source: verible
+    why: The current else branch synthesizes correctly, but explicit begin/end prevents future additional statements from unintentionally becoming unconditional.
+    fix: Add begin/end around the non-reset assignment: else begin q_o <= d_i; end
+[STYLE] line 12  (posix-eof) File must end with a newline.
+    source: verible
+    why: A missing trailing newline has no effect on simulation or synthesized hardware.
+    fix: Add a newline character after endmodule.
+0 critical, 3 warning, 1 style - review critical items before synthesis.

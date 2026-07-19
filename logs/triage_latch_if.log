@@ -1,0 +1,13 @@
+[CRITICAL] line 8  (incomplete-combinational-assignment) `data_o` is assigned only when `en_i` is high.
+    source: [!] AI-DETECTED (not reported by linter)
+    why: When `en_i` is low, `data_o` must retain its previous value, so synthesis infers a level-sensitive latch rather than purely combinational logic.
+    fix: Assign `data_o` on all paths, for example add `else begin data_o = '0; end`, or provide a default assignment before the `if` if latch behavior is not intended.
+[WARNING] line 7  (always-comb) Use 'always_comb' instead of 'always @*'.
+    source: verible
+    why: `always @*` generally synthesizes correctly, but `always_comb` more clearly declares combinational intent and enables stronger tool checks, including detection of incomplete combinational assignments.
+    fix: Replace `always @* begin` with `always_comb begin` after adding a complete assignment for `data_o`.
+[STYLE] line 12  (posix-eof) File must end with a newline.
+    source: verible
+    why: A missing trailing newline has no hardware or synthesis consequence, but can cause formatting and source-control tooling inconsistencies.
+    fix: Add a newline character after the final `endmodule` line.
+1 critical, 1 warning, 1 style - review critical items before synthesis.
