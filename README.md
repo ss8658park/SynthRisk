@@ -5,10 +5,11 @@
 SynthRisk uses GPT-5.6 to re-rank Verible RTL lint warnings by their real hardware
 consequence — separating cosmetic style nits from issues that actually turn into
 unintended hardware (inferred latches, unintended sequential logic) before a design
-is cast in silicon.
+is cast in silicon. It also inspects the source directly and reports synthesis risks
+the linter never flagged.
 
 > Built for the OpenAI Build Week hackathon.
-> Developed with **Codex**; the triage engine runs on **GPT-5.6**.
+> Developed with **Codex (GPT-5.6 Terra)**; the triage engine runs on **GPT-5.6 Terra** via the OpenAI API.
 
 ---
 
@@ -21,20 +22,24 @@ into **inferred latches** or unintended logic — bugs that only surface at the 
 or timing stage, where fixing them is enormously expensive. In silicon, there is no
 runtime patch.
 
-Linters like [Verible](https://github.com/chipsalliance/verible) do catch these. The
-trouble is *how* they report them: a real design produces hundreds of warnings, and a
-naming-convention nit is printed with the same weight as a latch-inferring `else`. The
-signal that matters drowns in noise.
+Linters like [Verible](https://github.com/chipsalliance/verible) catch many of these.
+The trouble is *how* they report them: a real design produces hundreds of warnings,
+and a missing-newline nit is printed with the same weight as a latch-inferring
+`case` statement. Worse, some real risks (a combinational `if` without `else`,
+blocking assignments in sequential logic) are not reported at all. The signal that
+matters drowns in noise — or never appears.
 
 ## What SynthRisk does
 
 SynthRisk adds the one thing a linter doesn't have: **judgment about consequence.**
 
-1. Runs `verible-verilog-lint` on a SystemVerilog file.
-2. Sends the warnings plus the source to **GPT-5.6**, which classifies each warning by
-   *synthesis risk* — does this actually become bad hardware, or is it just style?
-3. Prints the warnings re-ordered by risk, each with a plain-language reason and a
-   suggested fix.
+1. Runs `verible-verilog-lint --ruleset=all` on a SystemVerilog file.
+2. Sends the warnings **plus the full source** to **GPT-5.6**, which:
+   - classifies each linter warning by *synthesis risk* — critical / warning / style;
+   - independently inspects the source and reports latch-inference risks the linter
+     stayed silent on, marked with an `[!] AI-DETECTED` badge.
+3. Prints a risk-sorted report: each finding with a plain-language *why* and a
+   suggested *fix*.
 
 The linter knows the rules. SynthRisk knows the consequences.
 
@@ -44,37 +49,97 @@ The linter knows the rules. SynthRisk knows the consequences.
 ## Architecture
 
 ```
-.sv file ──▶ verible-verilog-lint ──▶ raw warnings
-                                          │
-                                          ▼
-                          GPT-5.6 triage (risk classification)
-                                          │
-                                          ▼
-                     risk-sorted report (reason + suggested fix)
+.sv file ──▶ verible-verilog-lint (--ruleset=all) ──▶ raw warnings
+                                                          │
+                                     full source ─────────┤
+                                                          ▼
+                                    GPT-5.6 Terra triage (one API call per file)
+                                     · risk classification of linter warnings
+                                     · independent latch-risk detection
+                                                          │
+                                                          ▼
+                              risk-sorted report (why + suggested fix)
 ```
 
 - **Detection:** Verible (deterministic rule checking)
-- **Judgment:** GPT-5.6 (context-aware risk classification)
-- **Built with:** Codex
+- **Judgment:** GPT-5.6 Terra (context-aware risk classification + gap detection)
+- **Built with:** Codex (GPT-5.6 Terra)
+
+## Setup
+
+Requirements: Python 3.8+, a [Verible](https://github.com/chipsalliance/verible/releases)
+binary, and an OpenAI API key.
+
+```bash
+git clone https://github.com/ss8658park/SynthRisk.git
+cd SynthRisk
+pip install -r requirements.txt
+```
+
+1. Install Verible: download a binary release for your platform and either put
+   `verible-verilog-lint` on your `PATH`, or point the env var `VERIBLE_LINT_PATH`
+   at the executable.
+2. Create a `.env` file in the project root:
+   ```
+   OPENAI_API_KEY=sk-...
+   ```
 
 ## Usage
 
-> _TODO: fill in once the CLI is finalized._
-
 ```bash
-# planned interface
-synthrisk path/to/design.sv
+# Full run: lint + GPT-5.6 triage
+python -m synthrisk examples/latch_if.sv
+
+# Linter output only, no AI call
+python -m synthrisk examples/latch_if.sv --no-ai
+
+# Development mode: render the report with canned findings, no API call
+python -m synthrisk examples/latch_if.sv --mock
+
+# Plain text (no ANSI colors); colors also auto-disable when piping to a file
+python -m synthrisk examples/latch_if.sv --no-color
 ```
 
 ## Example
 
-> _TODO: add real terminal output once the pipeline runs end-to-end._
+`examples/latch_if.sv` contains a combinational `if` with no `else` — a classic
+latch-inference bug. Verible (even with `--ruleset=all`) reports only a style
+suggestion and a missing newline. SynthRisk's output:
+
+```
+[CRITICAL] line 8  (incomplete-combinational-assignment) `data_o` is assigned only when `en_i` is true.
+    source: [!] AI-DETECTED (not reported by linter)
+    why: When `en_i` is low, `data_o` must retain its previous value, causing
+         synthesis to infer a level-sensitive latch.
+    fix: Add a default or `else` assignment, e.g. `data_o = '0; if (en_i) data_o = data_i;`.
+         If storage is intended, use an explicit `always_latch` block.
+[WARNING] line 7  (always-comb) Use 'always_comb' instead of 'always @*'.
+    source: verible
+    why: `always @*` is synthesizable, but `always_comb` declares combinational
+         intent and enables additional tool checks.
+    fix: Replace `always @* begin` with `always_comb begin`.
+[STYLE] line 12  (posix-eof) File must end with a newline.
+    source: verible
+    why: No effect on simulation or synthesized hardware.
+    fix: Add a newline after the final `endmodule`.
+1 critical, 1 warning, 1 style - review critical items before synthesis.
+```
+
+The item the linter never reported is the one that would have become real,
+incorrect hardware. Full logs for all three example cases are in [`logs/`](logs/).
 
 ## Built with Codex
 
-This project was developed using Codex inside VS Code. Development history is visible
-in the commit log. _TODO: add a short note / screenshots of Codex sessions before
-submission._
+The entire tool was developed with **Codex (GPT-5.6 Terra, medium reasoning)** inside
+VS Code, following a spec-driven workflow: each module (lint-output parser, triage
+engine, report renderer) was generated from a detailed prompt in a single Codex
+session, verified against the real Verible output, and committed immediately.
+
+- The commit history documents each Codex-generated change (commit messages are tagged
+  `generated with Codex, GPT-5.6 Terra`).
+- Screenshots of the Codex sessions are in [`docs/codex-evidence/`](docs/codex-evidence/).
+- The runtime triage engine calls **`gpt-5.6-terra`** via the OpenAI API — one request
+  per analyzed file.
 
 ## Roadmap (out of scope for the hackathon MVP)
 
