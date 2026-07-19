@@ -32,6 +32,16 @@ def _color_for(finding: Finding, text: str, use_color: bool) -> str:
     return f"{color}{text}{_RESET}" if color else text
 
 
+def format_critical_count(count: int, *, use_color: bool = True) -> str:
+    """Return a critical count in red when terminal color is available."""
+
+    text = str(count)
+    if count <= 0 or not use_color or not sys.stdout.isatty():
+        return text
+    color = _COLORS.get("critical", "")
+    return f"{color}{text}{_RESET}" if color else text
+
+
 def render_report(result: TriageResult, *, use_color: bool = True) -> None:
     """Print findings in priority order followed by a concise summary."""
 
