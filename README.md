@@ -33,13 +33,13 @@ matters drowns in noise — or never appears.
 
 SynthRisk adds the one thing a linter doesn't have: **judgment about consequence.**
 
-1. Runs `verible-verilog-lint --ruleset=all` on a SystemVerilog file.
+1. Runs `verible-verilog-lint --ruleset=all` on one or more SystemVerilog files.
 2. Sends the warnings **plus the full source** to **GPT-5.6**, which:
    - classifies each linter warning by *synthesis risk* — critical / warning / style;
    - independently inspects the source and reports latch-inference risks the linter
      stayed silent on, marked with an `[!] AI-DETECTED` badge.
-3. Prints a risk-sorted report: each finding with a plain-language *why* and a
-   suggested *fix*.
+3. Prints a risk-sorted report per file — each finding with a plain-language *why*
+   and a suggested *fix* — plus a cross-file risk summary table.
 
 The linter knows the rules. SynthRisk knows the consequences.
 
@@ -49,16 +49,16 @@ The linter knows the rules. SynthRisk knows the consequences.
 ## Architecture
 
 ```
-.sv file ──▶ verible-verilog-lint (--ruleset=all) ──▶ raw warnings
-                                                          │
-                                     full source ─────────┤
-                                                          ▼
-                                    GPT-5.6 Terra triage (one API call per file)
-                                     · risk classification of linter warnings
-                                     · independent latch-risk detection
-                                                          │
-                                                          ▼
-                              risk-sorted report (why + suggested fix)
+.sv files ──▶ verible-verilog-lint (--ruleset=all) ──▶ raw warnings
+                                                           │
+                                      full source ─────────┤
+                                                           ▼
+                                     GPT-5.6 Terra triage (one API call per file)
+                                      · risk classification of linter warnings
+                                      · independent latch-risk detection
+                                                           │
+                                                           ▼
+                        risk-sorted report per file + summary table
 ```
 
 - **Detection:** Verible (deterministic rule checking)
@@ -89,6 +89,9 @@ pip install -r requirements.txt
 ```bash
 # Full run: lint + GPT-5.6 triage
 python -m synthrisk examples/latch_if.sv
+
+# Multiple files (glob patterns work on Windows too)
+python -m synthrisk examples/*.sv
 
 # Linter output only, no AI call
 python -m synthrisk examples/latch_if.sv --no-ai
@@ -126,14 +129,32 @@ suggestion and a missing newline. SynthRisk's output:
 ```
 
 The item the linter never reported is the one that would have become real,
-incorrect hardware. Full logs for all three example cases are in [`logs/`](logs/).
+incorrect hardware.
+
+Running all four examples at once produces a per-file risk summary:
+
+```
+File                        Critical  Warning  Style
+examples/latch_if.sv           1        1       1
+examples/latch_case.sv         2        1       1
+examples/legacy_always.sv      0        3       1
+examples/clean.sv              0        0       8
+------------------------------------------------
+TOTAL                          3        5      11
+```
+
+Note the clean reference file: the linter still emits 8 style warnings on it,
+but SynthRisk correctly reports **zero synthesis risks** — no false alarms.
+
+Full logs for the example cases are in [`logs/`](logs/).
 
 ## Built with Codex
 
 The entire tool was developed with **Codex (GPT-5.6 Terra, medium reasoning)** inside
 VS Code, following a spec-driven workflow: each module (lint-output parser, triage
-engine, report renderer) was generated from a detailed prompt in a single Codex
-session, verified against the real Verible output, and committed immediately.
+engine, report renderer, multi-file runner) was generated from a detailed prompt in
+a single Codex session, verified against the real Verible output, and committed
+immediately.
 
 - The commit history documents each Codex-generated change (commit messages are tagged
   `generated with Codex, GPT-5.6 Terra`).
@@ -145,7 +166,7 @@ session, verified against the real Verible output, and committed immediately.
 
 - Support for additional RTL linters (Slang, Spyglass) behind the same triage layer
 - CI / git-hook integration
-- Multi-file / project-level analysis
+- Timing-risk hints alongside latch-risk detection
 
 ## License
 
