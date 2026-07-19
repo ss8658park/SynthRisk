@@ -26,6 +26,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         action="store_true",
         help="Use representative triage data without calling the API.",
     )
+    parser.add_argument(
+        "--no-color",
+        action="store_true",
+        help="Disable colored report output.",
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -51,6 +56,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     except (OSError, UnicodeError, TriageError) as exc:
         parser.error(str(exc))
 
-    render_report(triage_result)
+    render_report(triage_result, use_color=not args.no_color)
 
     return 0

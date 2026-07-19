@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import sys
+
 from .triage import Finding, TriageResult
 
 
@@ -23,14 +25,17 @@ except ImportError:
 _SEVERITY_ORDER = {"critical": 0, "warning": 1, "style": 2}
 
 
-def _color_for(finding: Finding, text: str) -> str:
+def _color_for(finding: Finding, text: str, use_color: bool) -> str:
+    if not use_color:
+        return text
     color = _COLORS.get(finding.severity, "")
     return f"{color}{text}{_RESET}" if color else text
 
 
-def render_report(result: TriageResult) -> None:
+def render_report(result: TriageResult, *, use_color: bool = True) -> None:
     """Print findings in priority order followed by a concise summary."""
 
+    use_color = use_color and sys.stdout.isatty()
     findings = sorted(
         result.findings,
         key=lambda finding: (_SEVERITY_ORDER.get(finding.severity, 99), finding.line),
@@ -41,9 +46,9 @@ def render_report(result: TriageResult) -> None:
             f"[{finding.severity.upper()}] line {finding.line}  "
             f"({finding.rule}) {finding.message}"
         )
-        print(_color_for(finding, header))
+        print(_color_for(finding, header, use_color))
         if finding.source == "ai":
-            print("    source: ★ AI-DETECTED (not reported by linter)")
+            print("    source: [!] AI-DETECTED (not reported by linter)")
         else:
             print("    source: verible")
         print(f"    why: {finding.why}")
