@@ -1,0 +1,6 @@
+examples/latch_if.sv:7:3-8: Use 'always_comb' instead of 'always @*'. [Style: combinational-logic] [always-comb]
+examples/latch_if.sv:12:10: File must end with a newline. [Style: posix-file-endings] [posix-eof]
+examples/latch_case.sv:7:3-8: Use 'always_comb' instead of 'always @*'. [Style: combinational-logic] [always-comb]
+examples/latch_case.sv:8:5-8: Explicitly define a default case for every case statement or add `unique` qualifier to the case statement. [Style: case-statements] [case-missing-default]
+examples/latch_case.sv:13:10: File must end with a newline. [Style: posix-file-endings] [posix-eof]
+examples/legacy_always.sv:12:10: File must end with a newline. [Style: posix-file-endings] [posix-eof]
