@@ -13,6 +13,31 @@ the linter never flagged.
 
 ---
 
+## How Codex and GPT-5.6 were used
+
+**Codex (GPT-5.6 Terra, medium reasoning) — development.** The entire tool was
+built with Codex inside VS Code, following a spec-driven workflow: each module
+was generated from a detailed prompt in a single Codex session, verified against
+real Verible output, and committed immediately.
+
+| Module | What Codex built |
+|---|---|
+| `synthrisk/lint_runner.py` | Runs Verible via subprocess; parses violations (handles Verible's nonzero exit on findings, single-column and column-range positions) |
+| `synthrisk/triage.py` | GPT-5.6 API call with structured JSON schema, dotenv loading, fenced-JSON recovery, mock mode for API-free development |
+| `synthrisk/report.py` | Severity-sorted colored terminal report, `[!] AI-DETECTED` badges, TTY-aware color handling |
+| `synthrisk/cli.py` | Argument parsing, multi-file support with Windows glob expansion, per-file headers, cross-file summary table |
+
+- Commit messages are tagged `generated with Codex, GPT-5.6 Terra`, so the commit
+  history maps 1:1 to these Codex sessions.
+- Screenshots of the Codex sessions are in [`docs/codex-evidence/`](docs/codex-evidence/).
+
+**GPT-5.6 Terra — runtime engine.** The triage engine calls **`gpt-5.6-terra`**
+via the OpenAI API, one request per analyzed file. Each request contains the full
+source plus the lint violations; GPT-5.6 (1) classifies every violation by
+synthesis risk, (2) independently detects latch-inference risks the linter did
+not report, and (3) returns structured JSON with a plain-language *why* and a
+suggested *fix* for each finding.
+
 ## The problem
 
 RTL (the code that describes a chip) can compile cleanly and pass simulation while
@@ -147,20 +172,6 @@ Note the clean reference file: the linter still emits 8 style warnings on it,
 but SynthRisk correctly reports **zero synthesis risks** — no false alarms.
 
 Full logs for the example cases are in [`logs/`](logs/).
-
-## Built with Codex
-
-The entire tool was developed with **Codex (GPT-5.6 Terra, medium reasoning)** inside
-VS Code, following a spec-driven workflow: each module (lint-output parser, triage
-engine, report renderer, multi-file runner) was generated from a detailed prompt in
-a single Codex session, verified against the real Verible output, and committed
-immediately.
-
-- The commit history documents each Codex-generated change (commit messages are tagged
-  `generated with Codex, GPT-5.6 Terra`).
-- Screenshots of the Codex sessions are in [`docs/codex-evidence/`](docs/codex-evidence/).
-- The runtime triage engine calls **`gpt-5.6-terra`** via the OpenAI API — one request
-  per analyzed file.
 
 ## Roadmap (out of scope for the hackathon MVP)
 
